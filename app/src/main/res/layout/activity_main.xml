@@ -152,14 +152,14 @@
                     android:nestedScrollingEnabled="false" />
 
                 <Button
-                    android:id="@+id/btn_add_sign"
+                    android:id="@+id/generate_btn"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="10dp"
                     android:layout_marginLeft="20dp"
                     android:layout_marginRight="20dp"
                     android:layout_marginTop="20dp"
-                    android:text="Add Signature"
+                    android:text="Generate PDF"
                     android:textSize="15dp" />
 
                 <Button
@@ -170,7 +170,8 @@
                     android:layout_marginLeft="20dp"
                     android:layout_marginRight="20dp"
                     android:layout_marginTop="10dp"
-                    android:text="asd"
+                    android:text="share"
+                    android:onClick="onShareClick"
                     android:textSize="15dp" />
             </LinearLayout>
 

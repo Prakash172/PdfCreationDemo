@@ -3,6 +3,7 @@ package com.wipro.pdfcreationdemo;
 import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -10,14 +11,13 @@ import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.StrictMode;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.widget.NestedScrollView;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.view.View;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -25,48 +25,60 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.security.Permission;
 
 import electrophile.mutils.MiniPermissionUtils;
 
 public class MainActivity extends AppCompatActivity {
-
+    private boolean pdfGenerated = false;
     private String path;
     private String signature_pdf_ = "abc";
-    private Bitmap b;
+    private Bitmap bitmap;
     private String imagesUri;
     private String signature_img_ = "abc";
     private File myPath;
     private int totalHeight;
     private int totalWidth;
+    private Uri uri;
+    private Button generateBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        if(Build.VERSION.SDK_INT>=24){
-            try{
+        if (Build.VERSION.SDK_INT >= 24) {
+            try {
                 Method m = StrictMode.class.getMethod("disableDeathOnFileUriExposure");
                 m.invoke(null);
-            }catch(Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
-        MiniPermissionUtils permissionUtils = new MiniPermissionUtils(this);
-        if(permissionUtils.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)){
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    takeScreenShot();
-                }
-            },1000);
-        }else permissionUtils.requestPermission(this,new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},100);
+        generateBtn = findViewById(R.id.generate_btn);
+        generateBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                MiniPermissionUtils permissionUtils = new MiniPermissionUtils(getApplicationContext());
+                if (permissionUtils.hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                    pdfGenerated = true;
+                    Toast.makeText(MainActivity.this, "Generating the PDF.....", Toast.LENGTH_SHORT).show();
+                    new Handler().postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            takeScreenShot();
+                            Toast.makeText(MainActivity.this, "Generated Successfully", Toast.LENGTH_SHORT).show();
+                        }
+                    }, 1000);
+                } else
+                    permissionUtils.requestPermission(MainActivity.this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 100);
+            }
+        });
+
     }
 
 
     private void takeScreenShot() {
 
-        File folder = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/Signature/");
+        File folder = new File(Environment.getExternalStorageDirectory().getAbsolutePath() + "/.Signature/");
 
         if (!folder.exists()) {
             boolean success = folder.mkdir();
@@ -80,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
         totalWidth = parentView.getWidth();// parent view width
 
         //Save bitmap to  below path
-        String extr = Environment.getExternalStorageDirectory() + "/Signature/";
+        String extr = Environment.getExternalStorageDirectory() + "/.Signature/";
         File file = new File(extr);
         if (!file.exists())
             file.mkdir();
@@ -88,10 +100,10 @@ public class MainActivity extends AppCompatActivity {
         myPath = new File(extr, fileName);
         imagesUri = myPath.getPath();
         FileOutputStream fos = null;
-        b = getBitmapFromView(parentView, totalHeight, totalWidth);
+        bitmap = getBitmapFromView(parentView, totalHeight, totalWidth);
         try {
             fos = new FileOutputStream(myPath);
-            b.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
             fos.flush();
             fos.close();
 
@@ -113,22 +125,22 @@ public class MainActivity extends AppCompatActivity {
     private void createPdf() {
 
         PdfDocument document = new PdfDocument();
-        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(b.getWidth(), b.getHeight(), 1).create();
+        PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(bitmap.getWidth(), bitmap.getHeight(), 1).create();
         PdfDocument.Page page = document.startPage(pageInfo);
 
         Canvas canvas = page.getCanvas();
-
 
         Paint paint = new Paint();
         paint.setColor(Color.parseColor("#ffffff"));
         canvas.drawPaint(paint);
 
 
-        Bitmap bitmap = Bitmap.createScaledBitmap(b, b.getWidth(), b.getHeight(), true);
+        Bitmap bitmap = Bitmap.createScaledBitmap(this.bitmap, this.bitmap.getWidth(), this.bitmap.getHeight(), true);
         paint.setColor(Color.BLUE);
         canvas.drawBitmap(bitmap, 0, 0, null);
         document.finishPage(page);
         File filePath = new File(path);
+        uri = Uri.fromFile(filePath);
         try {
             document.writeTo(new FileOutputStream(filePath));
         } catch (IOException e) {
@@ -143,15 +155,26 @@ public class MainActivity extends AppCompatActivity {
 
     private void openPdf(String path) {
         Intent target = new Intent(Intent.ACTION_VIEW);
-        target.setDataAndType(Uri.fromFile(new File(path)),"application/pdf");
+        target.setDataAndType(Uri.fromFile(new File(path)), "application/pdf");
         target.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
         target.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
         Intent intent = Intent.createChooser(target, "Open File");
         try {
             startActivity(intent);
         } catch (ActivityNotFoundException e) {
-            // Instruct the user to install a PDF reader here, or something
+            Toast.makeText(this, "No Application to Open this file", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    public void onShareClick(View v) {
+        if (pdfGenerated) {
+            Resources resources = getResources();
+            Intent emailIntent = new Intent();
+            emailIntent.setAction(Intent.ACTION_SEND);
+            emailIntent.setType("application/pdf");
+            emailIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            Intent openInChooser = Intent.createChooser(emailIntent, resources.getString(R.string.share_chooser_text));
+            startActivity(openInChooser);
+        } else Toast.makeText(this, "PDF NOT GENERATED", Toast.LENGTH_SHORT).show();
     }
 }
